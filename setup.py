@@ -15,6 +15,7 @@ import os
 os.path.dirname(os.path.abspath(__file__))
 
 setup(
+    version="1.0.0+3dgstream",
     name="diff_gaussian_rasterization",
     packages=['diff_gaussian_rasterization'],
     ext_modules=[

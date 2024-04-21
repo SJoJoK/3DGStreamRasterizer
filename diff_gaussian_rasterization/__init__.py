@@ -89,16 +89,16 @@ class _RasterizeGaussians(torch.autograd.Function):
                 print("\nAn error occured in forward. Please forward snapshot_fw.dump for debugging.")
                 raise ex
         else:
-            num_rendered, color, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
+            num_rendered, color, depth, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
 
         # Keep relevant tensors for backward
         ctx.raster_settings = raster_settings
         ctx.num_rendered = num_rendered
         ctx.save_for_backward(colors_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, geomBuffer, binningBuffer, imgBuffer)
-        return color, radii
+        return color, radii, depth
 
     @staticmethod
-    def backward(ctx, grad_out_color, _):
+    def backward(ctx, grad_out_color, grad_radii, grad_depth):
 
         # Restore necessary values from context
         num_rendered = ctx.num_rendered
@@ -118,7 +118,8 @@ class _RasterizeGaussians(torch.autograd.Function):
                 raster_settings.projmatrix, 
                 raster_settings.tanfovx, 
                 raster_settings.tanfovy, 
-                grad_out_color, 
+                grad_out_color,
+                grad_depth, 
                 sh, 
                 raster_settings.sh_degree, 
                 raster_settings.campos,
@@ -126,7 +127,9 @@ class _RasterizeGaussians(torch.autograd.Function):
                 num_rendered,
                 binningBuffer,
                 imgBuffer,
-                raster_settings.debug)
+                raster_settings.bwd_depth,
+                raster_settings.debug
+                )
 
         # Compute gradients for relevant tensors by invoking backward method
         if raster_settings.debug:
@@ -167,6 +170,7 @@ class GaussianRasterizationSettings(NamedTuple):
     campos : torch.Tensor
     prefiltered : bool
     debug : bool
+    bwd_depth : bool
 
 class GaussianRasterizer(nn.Module):
     def __init__(self, raster_settings):
